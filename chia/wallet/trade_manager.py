@@ -38,6 +38,7 @@ from chia.wallet.util.wallet_types import WalletType
 from chia.wallet.vc_wallet.cr_cat_drivers import ProofsChecker, construct_pending_approval_state
 from chia.wallet.vc_wallet.vc_wallet import VCWallet
 from chia.wallet.wallet import Wallet
+from chia.wallet.wallet_action_scope import WalletActionScope
 from chia.wallet.wallet_coin_record import WalletCoinRecord
 
 OFFER_MOD = load_clvm_maybe_recompile("settlement_payments.clsp")
@@ -235,6 +236,7 @@ class TradeManager:
         self,
         trades: List[bytes32],
         tx_config: TXConfig,
+        action_scope: WalletActionScope,
         fee: uint64 = uint64(0),
         secure: bool = True,  # Cancel with a transaction on chain
         trade_cache: Dict[bytes32, TradeRecord] = {},  # Optional pre-fetched trade records for optimization
@@ -291,6 +293,7 @@ class TradeManager:
                         tx_config.override(
                             excluded_coin_ids=[],
                         ),
+                        action_scope,
                         fee=fee_to_pay,
                         coins=selected_coins,
                         extra_conditions=extra_conditions,
@@ -307,6 +310,7 @@ class TradeManager:
                         tx_config.override(
                             excluded_coin_ids=[],
                         ),
+                        action_scope,
                         fee=fee_to_pay,
                         coins={coin},
                         extra_conditions=extra_conditions,
@@ -368,6 +372,7 @@ class TradeManager:
         self,
         offer: Dict[Union[int, bytes32], int],
         tx_config: TXConfig,
+        action_scope: WalletActionScope,
         driver_dict: Optional[Dict[bytes32, PuzzleInfo]] = None,
         solver: Optional[Solver] = None,
         fee: uint64 = uint64(0),
@@ -384,6 +389,7 @@ class TradeManager:
         result = await self._create_offer_for_ids(
             offer,
             tx_config,
+            action_scope,
             driver_dict,
             solver,
             fee=fee,
@@ -420,6 +426,7 @@ class TradeManager:
         self,
         offer_dict: Dict[Union[int, bytes32], int],
         tx_config: TXConfig,
+        action_scope: WalletActionScope,
         driver_dict: Optional[Dict[bytes32, PuzzleInfo]] = None,
         solver: Optional[Solver] = None,
         fee: uint64 = uint64(0),
@@ -521,6 +528,7 @@ class TradeManager:
                     offer_dict_no_ints,
                     driver_dict,
                     tx_config,
+                    action_scope,
                     solver,
                     fee,
                     extra_conditions,
@@ -552,6 +560,7 @@ class TradeManager:
                         abs(offer_dict[id]),
                         Offer.ph(),
                         tx_config,
+                        action_scope,
                         fee=fee_left_to_pay,
                         coins=selected_coins,
                         extra_conditions=(*extra_conditions, *announcements_to_assert),
@@ -566,6 +575,7 @@ class TradeManager:
                         amounts,
                         [Offer.ph()],
                         tx_config,
+                        action_scope,
                         fee=fee_left_to_pay,
                         coins=selected_coins,
                         extra_conditions=(*extra_conditions, *announcements_to_assert),
@@ -577,6 +587,7 @@ class TradeManager:
                         [abs(offer_dict[id])],
                         [Offer.ph()],
                         tx_config,
+                        action_scope,
                         fee=fee_left_to_pay,
                         coins=selected_coins,
                         extra_conditions=(*extra_conditions, *announcements_to_assert),
@@ -752,6 +763,7 @@ class TradeManager:
         offer: Offer,
         peer: WSChiaConnection,
         tx_config: TXConfig,
+        action_scope: WalletActionScope,
         solver: Optional[Solver] = None,
         fee: uint64 = uint64(0),
         extra_conditions: Tuple[Condition, ...] = tuple(),
@@ -783,6 +795,7 @@ class TradeManager:
         result = await self._create_offer_for_ids(
             take_offer_dict,
             tx_config,
+            action_scope,
             offer.driver_dict,
             solver,
             fee=fee,
@@ -795,7 +808,7 @@ class TradeManager:
         success, take_offer, _, error = result
 
         complete_offer, valid_spend_solver = await self.check_for_final_modifications(
-            Offer.aggregate([offer, take_offer]), solver, tx_config
+            Offer.aggregate([offer, take_offer]), solver, tx_config, action_scope
         )
         self.log.info("COMPLETE OFFER: %s", complete_offer.to_bech32())
         assert complete_offer.is_valid()
@@ -851,6 +864,7 @@ class TradeManager:
         offer_dict: Dict[Optional[bytes32], int],
         driver_dict: Dict[bytes32, PuzzleInfo],
         tx_config: TXConfig,
+        action_scope: WalletActionScope,
         solver: Solver,
         fee: uint64 = uint64(0),
         extra_conditions: Tuple[Condition, ...] = tuple(),
@@ -863,7 +877,7 @@ class TradeManager:
                 == AssetType.ROYALTY_TRANSFER_PROGRAM.value
             ):
                 return await NFTWallet.make_nft1_offer(
-                    self.wallet_state_manager, offer_dict, driver_dict, tx_config, fee, extra_conditions
+                    self.wallet_state_manager, offer_dict, driver_dict, tx_config, action_scope, fee, extra_conditions
                 )
             elif (
                 puzzle_info.check_type(
@@ -875,7 +889,14 @@ class TradeManager:
                 and puzzle_info.also()["updater_hash"] == ACS_MU_PH  # type: ignore
             ):
                 return await DataLayerWallet.make_update_offer(
-                    self.wallet_state_manager, offer_dict, driver_dict, solver, tx_config, fee, extra_conditions
+                    self.wallet_state_manager,
+                    offer_dict,
+                    driver_dict,
+                    solver,
+                    tx_config,
+                    action_scope,
+                    fee,
+                    extra_conditions,
                 )
         return None
 
@@ -934,7 +955,7 @@ class TradeManager:
         }
 
     async def check_for_final_modifications(
-        self, offer: Offer, solver: Solver, tx_config: TXConfig
+        self, offer: Offer, solver: Solver, tx_config: TXConfig, action_scope: WalletActionScope
     ) -> Tuple[Offer, Solver]:
         for puzzle_info in offer.driver_dict.values():
             if (
@@ -957,7 +978,7 @@ class TradeManager:
                 for _, wallet in self.wallet_state_manager.wallets.items():
                     if WalletType(wallet.type()) == WalletType.VC:
                         assert isinstance(wallet, VCWallet)
-                        return await wallet.add_vc_authorization(offer, solver, tx_config)
+                        return await wallet.add_vc_authorization(offer, solver, tx_config, action_scope)
                 else:
                     raise ValueError("No VCs to approve CR-CATs with")  # pragma: no cover
 
