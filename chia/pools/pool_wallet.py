@@ -459,6 +459,10 @@ class PoolWallet:
         p2_singleton_puzzle_hash: bytes32 = launcher_id_to_p2_puzzle_hash(
             launcher_coin_id, p2_singleton_delay_time, p2_singleton_delayed_ph
         )
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(standard_wallet_record)
+
         return standard_wallet_record, p2_singleton_puzzle_hash, launcher_coin_id
 
     async def _get_owner_key_cache(self) -> Tuple[PrivateKey, uint32]:
@@ -491,6 +495,10 @@ class PoolWallet:
             primaries=None,
             extra_conditions=extra_conditions,
         )
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(fee_tx)
+
         return fee_tx
 
     async def generate_travel_transactions(
@@ -589,6 +597,11 @@ class PoolWallet:
             name=unsigned_spend_bundle.name(),
             valid_times=ConditionValidTimes(),
         )
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(tx_record)
+            if fee_tx is not None:
+                interface.side_effects.transactions.append(fee_tx)
 
         return tx_record, fee_tx
 
@@ -724,6 +737,10 @@ class PoolWallet:
         self.next_transaction_fee = fee
         self.next_tx_config = tx_config
         travel_tx, fee_tx = await self.generate_travel_transactions(fee, tx_config, action_scope)
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(travel_tx)
+            if fee_tx is not None:
+                interface.side_effects.transactions.append(fee_tx)
         return total_fee, travel_tx, fee_tx
 
     async def self_pool(
@@ -764,6 +781,10 @@ class PoolWallet:
         self.next_transaction_fee = fee
         self.next_tx_config = tx_config
         travel_tx, fee_tx = await self.generate_travel_transactions(fee, tx_config, action_scope)
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(travel_tx)
+            if fee_tx is not None:
+                interface.side_effects.transactions.append(fee_tx)
         return total_fee, travel_tx, fee_tx
 
     async def claim_pool_rewards(
@@ -875,6 +896,11 @@ class PoolWallet:
             name=full_spend.name(),
             valid_times=ConditionValidTimes(),
         )
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(absorb_transaction)
+            if fee_tx is not None:
+                interface.side_effects.transactions.append(fee_tx)
 
         return absorb_transaction, fee_tx
 

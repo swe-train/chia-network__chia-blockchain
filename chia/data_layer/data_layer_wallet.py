@@ -368,6 +368,8 @@ class DataLayerWallet:
         await self.wallet_state_manager.dl_store.add_singleton_record(singleton_record)
         await self.wallet_state_manager.add_interested_puzzle_hashes([singleton_record.launcher_id], [self.id()])
 
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(std_record)
         return std_record, launcher_coin.name()
 
     async def create_tandem_xch_tx(
@@ -387,6 +389,8 @@ class DataLayerWallet:
             extra_conditions=(announcement_to_assert,),
         )
         assert chia_tx.spend_bundle is not None
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(chia_tx)
         return chia_tx
 
     async def create_update_state_spend(
@@ -614,6 +618,9 @@ class DataLayerWallet:
                     second_singleton_record,
                 )
 
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.extend(txs)
+
         return txs
 
     async def generate_signed_transaction(
@@ -649,7 +656,7 @@ class DataLayerWallet:
         if len(amounts) != 1 or len(puzzle_hashes) != 1:
             raise ValueError("The wallet can only send one DL coin to one place at a time")
 
-        return await self.create_update_state_spend(
+        txs = await self.create_update_state_spend(
             launcher_id,
             new_root_hash,
             tx_config,
@@ -661,6 +668,11 @@ class DataLayerWallet:
             announce_new_state,
             extra_conditions,
         )
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.extend(txs)
+
+        return txs
 
     async def get_spendable_singleton_info(self, launcher_id: bytes32) -> Tuple[SingletonRecord, LineageProof]:
         # First, let's make sure this is a singleton that we track and that we can spend
@@ -737,6 +749,10 @@ class DataLayerWallet:
             extra_conditions=extra_conditions,
         )
         assert create_mirror_tx_record.spend_bundle is not None
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(create_mirror_tx_record)
+
         return [create_mirror_tx_record]
 
     async def delete_mirror(
@@ -820,6 +836,9 @@ class DataLayerWallet:
                 ),
                 dataclasses.replace(chia_tx, spend_bundle=None),
             ]
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.extend(txs)
 
         return txs
 
@@ -1221,6 +1240,10 @@ class DataLayerWallet:
             for k, v in offer_dict.items()
             if v > 0
         }
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.extend(all_transactions)
+
         return Offer(requested_payments, SpendBundle.aggregate(all_bundles), driver_dict), all_transactions
 
     @staticmethod

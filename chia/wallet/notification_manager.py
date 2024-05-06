@@ -123,4 +123,9 @@ class NotificationManager:
         full_tx: TransactionRecord = dataclasses.replace(
             chia_tx, spend_bundle=SpendBundle.aggregate([chia_tx.spend_bundle, extra_spend_bundle])
         )
+        async with action_scope.use() as interface:
+            for tx in interface.side_effects.transactions:
+                if tx.name == chia_tx.name:
+                    break
+            tx = full_tx
         return full_tx

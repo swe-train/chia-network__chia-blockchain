@@ -420,6 +420,9 @@ class TradeManager:
         if success is True and trade_offer is not None and not validate_only:
             await self.save_trade(trade_offer, created_offer)
 
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.extend(tx_records)
+
         return success, trade_offer, tx_records, error
 
     async def _create_offer_for_ids(
@@ -856,6 +859,9 @@ class TradeManager:
             memos=[],
             valid_times=ConditionValidTimes(),
         )
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.extend(tx_records)
 
         return trade_record, [push_tx, *tx_records]
 

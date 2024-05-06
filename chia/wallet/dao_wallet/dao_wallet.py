@@ -201,6 +201,9 @@ class DAOWallet:
         )
         await self.save_info(dao_info)
 
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.extend(txs)
+
         return self, txs
 
     @staticmethod
@@ -806,6 +809,8 @@ class DAOWallet:
         await self.wallet_state_manager.add_interested_coin_ids([launcher_coin.name()], [self.wallet_id])
 
         await self.wallet_state_manager.add_interested_coin_ids([eve_coin.name()], [self.wallet_id])
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(treasury_record)
         return [treasury_record, regular_record]
 
     async def generate_treasury_eve_spend(
@@ -961,6 +966,8 @@ class DAOWallet:
             memos=[],
             valid_times=parse_timelock_info(extra_conditions),
         )
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(record)
         return [record]
 
     async def generate_proposal_eve_spend(
@@ -1146,6 +1153,8 @@ class DAOWallet:
             memos=[],
             valid_times=parse_timelock_info(extra_conditions),
         )
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(record)
         return [record]
 
     async def create_proposal_close_spend(
@@ -1509,6 +1518,8 @@ class DAOWallet:
             memos=[],
             valid_times=parse_timelock_info(extra_conditions),
         )
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(record)
         return record
 
     async def fetch_proposed_puzzle_reveal(self, proposal_id: bytes32) -> Program:
@@ -1569,6 +1580,8 @@ class DAOWallet:
                 fee=fee,
                 extra_conditions=extra_conditions,
             )
+            async with action_scope.use() as interface:
+                interface.side_effects.transactions.extend(tx_records)
             return tx_records
         else:  # pragma: no cover
             raise ValueError(f"Assets of type {funding_wallet.type()} are not currently supported.")
@@ -1587,6 +1600,8 @@ class DAOWallet:
         tx_record = await self._create_treasury_fund_transaction(
             funding_wallet, amount, tx_config, action_scope, fee, extra_conditions=extra_conditions
         )
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(tx_record[0])
         return tx_record[0]
 
     async def fetch_singleton_lineage_proof(self, coin: Coin) -> LineageProof:
@@ -1661,6 +1676,8 @@ class DAOWallet:
             memos=[],
             valid_times=parse_timelock_info(extra_conditions),
         )
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(record)
         return record
 
     async def parse_proposal(self, proposal_id: bytes32) -> Dict[str, Any]:

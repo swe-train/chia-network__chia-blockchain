@@ -1310,6 +1310,8 @@ class DIDWallet:
             valid_times=ConditionValidTimes(),
         )
         regular_record = dataclasses.replace(tx_record, spend_bundle=None)
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(did_record)
         return [did_record, regular_record]
 
     async def generate_eve_spend(

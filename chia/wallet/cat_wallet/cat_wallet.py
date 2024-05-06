@@ -616,6 +616,9 @@ class CATWallet:
             assert message is not None
             announcement = AssertCoinAnnouncement(asserted_id=origin_id, asserted_msg=message)
 
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(chia_tx)
+
         return chia_tx, announcement
 
     async def generate_unsigned_spendbundle(
@@ -845,6 +848,9 @@ class CATWallet:
                     valid_times=parse_timelock_info(extra_conditions),
                 )
             )
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.extend(tx_list)
 
         return tx_list
 

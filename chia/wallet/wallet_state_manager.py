@@ -1043,6 +1043,8 @@ class WalletStateManager:
             valid_times=parse_timelock_info(extra_conditions),
         )
         tx_list.append(tx_record)
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(tx_record)
         return tx_list
 
     async def filter_spam(self, new_coin_state: List[CoinState]) -> List[CoinState]:

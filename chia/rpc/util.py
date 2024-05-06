@@ -153,10 +153,9 @@ def tx_endpoint(
                 # unfortunately, this API isn't solely a tx endpoint
                 return response
 
-            tx_records: List[TransactionRecord] = [
-                TransactionRecord.from_json_dict_convenience(tx) for tx in response["transactions"]
-            ]
-            unsigned_txs = await self.service.wallet_state_manager.gather_signing_info_for_txs(tx_records)
+            unsigned_txs = await self.service.wallet_state_manager.gather_signing_info_for_txs(
+                action_scope.side_effects.transactions
+            )
 
             if not request.get("CHIP-0029", False):
                 response["unsigned_transactions"] = [tx.to_json_dict() for tx in unsigned_txs]
@@ -166,11 +165,13 @@ def tx_endpoint(
             new_txs: List[TransactionRecord] = []
             if request.get("sign", self.service.config.get("auto_sign_txs", True)):
                 new_txs, signing_responses = await self.service.wallet_state_manager.sign_transactions(
-                    tx_records, response.get("signing_responses", []), "signing_responses" in response
+                    action_scope.side_effects.transactions,
+                    response.get("signing_responses", []),
+                    "signing_responses" in response,
                 )
                 response["signing_responses"] = [byte_serialize_clvm_streamable(r).hex() for r in signing_responses]
             else:
-                new_txs = tx_records  # pragma: no cover
+                new_txs = action_scope.side_effects.transactions  # pragma: no cover
 
             if request.get("push", push):
                 new_txs = await self.service.wallet_state_manager.add_pending_transactions(

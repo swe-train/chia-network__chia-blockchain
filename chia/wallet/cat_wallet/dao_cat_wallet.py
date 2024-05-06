@@ -391,6 +391,8 @@ class DAOCATWallet:
             CAT_MOD, self.dao_cat_info.limitations_program_hash, lockup_puzzle
         ).get_tree_hash()
         await self.wallet_state_manager.add_interested_puzzle_hashes([cat_puzzle_hash], [self.id()])
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.extend(txs)
         return txs
 
     async def exit_vote_state(
@@ -498,6 +500,8 @@ class DAOCATWallet:
             new_locked_coins,
         )
         await self.save_info(dao_cat_info)
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(record)
         return [record]
 
     async def remove_active_proposal(
