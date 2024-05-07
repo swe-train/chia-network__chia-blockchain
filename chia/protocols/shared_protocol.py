@@ -39,6 +39,10 @@ class Capability(IntEnum):
     # a node can handle a None response and not wait the full timeout
     NONE_RESPONSE = 4
 
+    # Opts in to receiving mempool updates for subscribed transactions
+    # This is between a full node and receiving wallet
+    MEMPOOL_UPDATES = 5
+
 
 @streamable
 @dataclass(frozen=True)
