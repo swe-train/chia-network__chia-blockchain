@@ -827,7 +827,7 @@ class DIDWallet:
         )
         list_of_coinspends = [make_spend(coin, full_puzzle, fullsol)]
         unsigned_spend_bundle = SpendBundle(list_of_coinspends, G2Element())
-        return TransactionRecord(
+        tx = TransactionRecord(
             confirmed_at_height=uint32(0),
             created_at_time=uint64(int(time.time())),
             to_puzzle_hash=p2_ph,
@@ -846,6 +846,9 @@ class DIDWallet:
             memos=list(compute_memos(unsigned_spend_bundle).items()),
             valid_times=parse_timelock_info(extra_conditions),
         )
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(tx)
+        return tx
 
     # This is used to cash out, or update the id_list
     async def create_exit_spend(

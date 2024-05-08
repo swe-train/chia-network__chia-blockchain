@@ -861,7 +861,7 @@ class TradeManager:
         )
 
         async with action_scope.use() as interface:
-            interface.side_effects.transactions.extend(tx_records)
+            interface.side_effects.transactions = [push_tx, *tx_records]
 
         return trade_record, [push_tx, *tx_records]
 

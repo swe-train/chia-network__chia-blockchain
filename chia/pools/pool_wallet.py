@@ -690,6 +690,13 @@ class PoolWallet:
 
         # Current inner will be updated when state is verified on the blockchain
         full_spend: SpendBundle = SpendBundle.aggregate([create_launcher_tx_record.spend_bundle, launcher_sb])
+        async with action_scope.use() as interface:
+            # This should not be looked to for best practice. Ideally, the method to generate the transaction above
+            # takes a parameter to add in extra spends. That's currently out of scope, so I'm placing this hack in rn.
+            relevant_index = interface.side_effects.transactions.index(create_launcher_tx_record)
+            interface.side_effects.transactions[relevant_index] = dataclasses.replace(
+                interface.side_effects.transactions[relevant_index], spend_bundle=None
+            )
         return full_spend, puzzle_hash, launcher_coin.name()
 
     async def join_pool(
@@ -737,10 +744,6 @@ class PoolWallet:
         self.next_transaction_fee = fee
         self.next_tx_config = tx_config
         travel_tx, fee_tx = await self.generate_travel_transactions(fee, tx_config, action_scope)
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.append(travel_tx)
-            if fee_tx is not None:
-                interface.side_effects.transactions.append(fee_tx)
         return total_fee, travel_tx, fee_tx
 
     async def self_pool(
@@ -781,10 +784,6 @@ class PoolWallet:
         self.next_transaction_fee = fee
         self.next_tx_config = tx_config
         travel_tx, fee_tx = await self.generate_travel_transactions(fee, tx_config, action_scope)
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.append(travel_tx)
-            if fee_tx is not None:
-                interface.side_effects.transactions.append(fee_tx)
         return total_fee, travel_tx, fee_tx
 
     async def claim_pool_rewards(
