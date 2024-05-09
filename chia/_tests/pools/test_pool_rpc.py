@@ -819,7 +819,9 @@ class TestPoolWalletRpc:
         leave_pool_tx: Dict[str, Any] = await client.pw_self_pool(wallet_id, uint64(fee))
         assert leave_pool_tx["transaction"].wallet_id == wallet_id
         assert leave_pool_tx["transaction"].amount == 1
-        await full_node_api.wait_transaction_records_entered_mempool(records=[leave_pool_tx["transaction"]])
+        await full_node_api.wait_transaction_records_entered_mempool(
+            records=[TransactionRecord.from_json_dict_convenience(tx) for tx in leave_pool_tx["transactions"]]
+        )
 
         await full_node_api.farm_blocks_to_puzzlehash(count=1, farm_to=our_ph, guarantee_transaction_blocks=True)
 
@@ -894,6 +896,7 @@ class TestPoolWalletRpc:
         assert pw_info.current.pool_url == "https://pool-a.org"
         assert pw_info.current.relative_lock_height == 5
 
+        await full_node_api.wait_for_wallet_synced(wallet_node=wallet_node, timeout=20)
         join_pool_tx: TransactionRecord = (
             await client.pw_join_pool(
                 wallet_id,

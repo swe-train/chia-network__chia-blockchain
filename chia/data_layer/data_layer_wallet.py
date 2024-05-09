@@ -345,10 +345,18 @@ class DataLayerWallet:
             SerializedProgram.from_program(genesis_launcher_solution),
         )
         launcher_sb: SpendBundle = SpendBundle([launcher_cs], G2Element())
-        full_spend: SpendBundle = SpendBundle.aggregate([create_launcher_tx_record.spend_bundle, launcher_sb])
 
-        # Delete from standard transaction so we don't push duplicate spends
-        std_record: TransactionRecord = dataclasses.replace(create_launcher_tx_record, spend_bundle=full_spend)
+        async with action_scope.use() as interface:
+            # This should not be looked to for best practice. Ideally, the method to generate the transaction above
+            # takes a parameter to add in extra spends. That's currently out of scope, so I'm placing this hack in rn.
+            relevant_index = interface.side_effects.transactions.index(create_launcher_tx_record)
+            assert create_launcher_tx_record.spend_bundle is not None
+            create_launcher_tx_record = dataclasses.replace(
+                interface.side_effects.transactions[relevant_index],
+                spend_bundle=SpendBundle.aggregate([create_launcher_tx_record.spend_bundle, launcher_sb]),
+            )
+            interface.side_effects.transactions[relevant_index] = create_launcher_tx_record
+
         singleton_record = SingletonRecord(
             coin_id=Coin(launcher_coin.name(), full_puzzle.get_tree_hash(), uint64(1)).name(),
             launcher_id=launcher_coin.name(),
@@ -368,9 +376,7 @@ class DataLayerWallet:
         await self.wallet_state_manager.dl_store.add_singleton_record(singleton_record)
         await self.wallet_state_manager.add_interested_puzzle_hashes([singleton_record.launcher_id], [self.id()])
 
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.append(std_record)
-        return std_record, launcher_coin.name()
+        return create_launcher_tx_record, launcher_coin.name()
 
     async def create_tandem_xch_tx(
         self,
@@ -602,9 +608,6 @@ class DataLayerWallet:
                 action_scope,
             )
             assert chia_tx.spend_bundle is not None
-            aggregate_bundle = SpendBundle.aggregate([dl_tx.spend_bundle, chia_tx.spend_bundle])
-            dl_tx = dataclasses.replace(dl_tx, spend_bundle=aggregate_bundle, name=aggregate_bundle.name())
-            chia_tx = dataclasses.replace(chia_tx, spend_bundle=None)
             txs: List[TransactionRecord] = [dl_tx, chia_tx]
         else:
             txs = [dl_tx]
@@ -619,7 +622,7 @@ class DataLayerWallet:
                 )
 
         async with action_scope.use() as interface:
-            interface.side_effects.transactions.extend(txs)
+            interface.side_effects.transactions.append(dl_tx)
 
         return txs
 
@@ -668,9 +671,6 @@ class DataLayerWallet:
             announce_new_state,
             extra_conditions,
         )
-
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.extend(txs)
 
         return txs
 
@@ -1225,14 +1225,11 @@ class DataLayerWallet:
                 coin_spends=[*all_other_spends, new_spend],
             )
             all_bundles.append(new_bundle)
-            all_transactions.append(
-                dataclasses.replace(
-                    txs[0],
-                    spend_bundle=new_bundle,
-                    name=new_bundle.name(),
+            async with action_scope.use() as interface:
+                relevant_index = interface.side_effects.transactions.index(txs[0])
+                interface.side_effects.transactions[relevant_index] = dataclasses.replace(
+                    interface.side_effects.transactions[relevant_index], spend_bundle=new_bundle
                 )
-            )
-            all_transactions.extend(txs[1:])
 
         # create some dummy requested payments
         requested_payments = {
@@ -1240,9 +1237,6 @@ class DataLayerWallet:
             for k, v in offer_dict.items()
             if v > 0
         }
-
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.extend(all_transactions)
 
         return Offer(requested_payments, SpendBundle.aggregate(all_bundles), driver_dict), all_transactions
 

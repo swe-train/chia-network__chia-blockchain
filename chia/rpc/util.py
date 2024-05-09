@@ -195,14 +195,14 @@ def tx_endpoint(
                     or func.__name__ == "pw_absorb_rewards"
                 ):
                     # Theses RPCs return not "convenience" for some reason
-                    response["transaction"] = new_txs[0].to_json_dict()
+                    response["transaction"] = new_txs[len(new_txs) - 1].to_json_dict()
                 else:
                     response["transaction"] = response["transactions"][0]
             if "tx_record" in response:
                 response["tx_record"] = response["transactions"][0]
             if "fee_transaction" in response and response["fee_transaction"] is not None:
                 # Theses RPCs return not "convenience" for some reason
-                response["fee_transaction"] = new_txs[1].to_json_dict()
+                response["fee_transaction"] = next(tx for tx in new_txs if tx.wallet_id == 1).to_json_dict()
             if "transaction_id" in response:
                 response["transaction_id"] = new_txs[0].name
             if "transaction_ids" in response:
