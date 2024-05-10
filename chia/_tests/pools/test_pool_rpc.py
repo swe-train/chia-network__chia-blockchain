@@ -531,8 +531,8 @@ class TestPoolWalletRpc:
             assert bal["confirmed_wallet_balance"] == pool_expected_confirmed_balance
 
             # Claim
-            absorb_tx: TransactionRecord = (await client.pw_absorb_rewards(2, uint64(fee), 1))["transaction"]
-            await full_node_api.process_transaction_records(records=[absorb_tx])
+            absorb_txs: List[TransactionRecord] = (await client.pw_absorb_rewards(2, uint64(fee), 1))["transactions"]
+            await full_node_api.process_transaction_records(records=absorb_txs)
             main_expected_confirmed_balance -= fee
             main_expected_confirmed_balance += 1_750_000_000_000
             pool_expected_confirmed_balance -= 1_750_000_000_000
@@ -600,13 +600,14 @@ class TestPoolWalletRpc:
 
             # Claim block_count * 1.75
             ret = await client.pw_absorb_rewards(2, uint64(fee))
-            absorb_tx: TransactionRecord = ret["transaction"]
+            absorb_txs: List[TransactionRecord] = ret["transactions"]
             if fee == 0:
                 assert ret["fee_transaction"] is None
             else:
                 assert ret["fee_transaction"].fee_amount == fee
-            assert absorb_tx.fee_amount == fee
-            await full_node_api.process_transaction_records(records=[absorb_tx])
+            assert absorb_txs[0].fee_amount == fee
+            assert absorb_txs[1].fee_amount == fee
+            await full_node_api.process_transaction_records(records=absorb_txs)
             main_expected_confirmed_balance -= fee
             main_expected_confirmed_balance += block_count * 1_750_000_000_000
 
@@ -963,7 +964,7 @@ class TestPoolWalletRpc:
         assert pw_info.current.pool_url == "https://pool-a.org"
         assert pw_info.current.relative_lock_height == 5
 
-        join_pool_tx: TransactionRecord = (
+        join_pool_txs: List[TransactionRecord] = (
             await client.pw_join_pool(
                 wallet_id,
                 pool_b_ph,
@@ -971,9 +972,8 @@ class TestPoolWalletRpc:
                 uint32(10),
                 uint64(fee),
             )
-        )["transaction"]
-        assert join_pool_tx is not None
-        await full_node_api.wait_transaction_records_entered_mempool(records=[join_pool_tx])
+        )["transactions"]
+        await full_node_api.wait_transaction_records_entered_mempool(records=join_pool_txs)
         await full_node_api.farm_blocks_to_puzzlehash(count=1, farm_to=our_ph, guarantee_transaction_blocks=True)
 
         async def status_is_leaving_no_blocks() -> bool:
@@ -991,7 +991,7 @@ class TestPoolWalletRpc:
             force_overflow=True,
             guarantee_transaction_block=True,
             seed=32 * b"4",
-            transaction_data=join_pool_tx.spend_bundle,
+            transaction_data=next(tx.spend_bundle for tx in join_pool_txs if tx.spend_bundle is not None),
         )
 
         for block in more_blocks[-3:]:
