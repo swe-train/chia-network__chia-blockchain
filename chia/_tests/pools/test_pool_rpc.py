@@ -605,8 +605,8 @@ class TestPoolWalletRpc:
                 assert ret["fee_transaction"] is None
             else:
                 assert ret["fee_transaction"].fee_amount == fee
-            assert absorb_txs[0].fee_amount == fee
-            assert absorb_txs[1].fee_amount == fee
+            for tx in absorb_txs:
+                assert tx.fee_amount == fee
             await full_node_api.process_transaction_records(records=absorb_txs)
             main_expected_confirmed_balance -= fee
             main_expected_confirmed_balance += block_count * 1_750_000_000_000
@@ -820,9 +820,7 @@ class TestPoolWalletRpc:
         leave_pool_tx: Dict[str, Any] = await client.pw_self_pool(wallet_id, uint64(fee))
         assert leave_pool_tx["transaction"].wallet_id == wallet_id
         assert leave_pool_tx["transaction"].amount == 1
-        await full_node_api.wait_transaction_records_entered_mempool(
-            records=[TransactionRecord.from_json_dict_convenience(tx) for tx in leave_pool_tx["transactions"]]
-        )
+        await full_node_api.wait_transaction_records_entered_mempool(records=leave_pool_tx["transactions"])
 
         await full_node_api.farm_blocks_to_puzzlehash(count=1, farm_to=our_ph, guarantee_transaction_blocks=True)
 

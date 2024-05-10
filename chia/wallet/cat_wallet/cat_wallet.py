@@ -616,9 +616,6 @@ class CATWallet:
             assert message is not None
             announcement = AssertCoinAnnouncement(asserted_id=origin_id, asserted_msg=message)
 
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.append(chia_tx)
-
         return chia_tx, announcement
 
     async def generate_unsigned_spendbundle(
@@ -804,27 +801,26 @@ class CATWallet:
         else:
             other_tx_removals = set()
             other_tx_additions = set()
-        tx_list = [
-            TransactionRecord(
-                confirmed_at_height=uint32(0),
-                created_at_time=uint64(int(time.time())),
-                to_puzzle_hash=puzzle_hashes[0],
-                amount=uint64(payment_sum),
-                fee_amount=fee,
-                confirmed=False,
-                sent=uint32(0),
-                spend_bundle=spend_bundle,
-                additions=list(set(spend_bundle.additions()) - other_tx_additions),
-                removals=list(set(spend_bundle.removals()) - other_tx_removals),
-                wallet_id=self.id(),
-                sent_to=[],
-                trade_id=None,
-                type=uint32(TransactionType.OUTGOING_TX.value),
-                name=spend_bundle.name(),
-                memos=list(compute_memos(spend_bundle).items()),
-                valid_times=parse_timelock_info(extra_conditions),
-            )
-        ]
+        tx = TransactionRecord(
+            confirmed_at_height=uint32(0),
+            created_at_time=uint64(int(time.time())),
+            to_puzzle_hash=puzzle_hashes[0],
+            amount=uint64(payment_sum),
+            fee_amount=fee,
+            confirmed=False,
+            sent=uint32(0),
+            spend_bundle=spend_bundle,
+            additions=list(set(spend_bundle.additions()) - other_tx_additions),
+            removals=list(set(spend_bundle.removals()) - other_tx_removals),
+            wallet_id=self.id(),
+            sent_to=[],
+            trade_id=None,
+            type=uint32(TransactionType.OUTGOING_TX.value),
+            name=spend_bundle.name(),
+            memos=list(compute_memos(spend_bundle).items()),
+            valid_times=parse_timelock_info(extra_conditions),
+        )
+        tx_list = [tx]
 
         if chia_tx is not None:
             tx_list.append(
@@ -850,7 +846,7 @@ class CATWallet:
             )
 
         async with action_scope.use() as interface:
-            interface.side_effects.transactions.extend(tx_list)
+            interface.side_effects.transactions.append(tx)
 
         return tx_list
 

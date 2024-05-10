@@ -411,7 +411,12 @@ class VCWallet:
         )
         assert did_tx.spend_bundle is not None
         final_bundle: SpendBundle = SpendBundle.aggregate([SpendBundle([vc_spend], G2Element()), did_tx.spend_bundle])
-        did_tx = dataclasses.replace(did_tx, spend_bundle=final_bundle, name=final_bundle.name())
+        async with action_scope.use() as interface:
+            # This should not be looked to for best practice. Ideally, the method to generate the transaction above
+            # takes a parameter to add in extra spends. That's currently out of scope, so I'm placing this hack in rn.
+            relevant_index = interface.side_effects.transactions.index(did_tx)
+            did_tx = dataclasses.replace(did_tx, spend_bundle=final_bundle, name=final_bundle.name())
+            interface.side_effects.transactions[relevant_index] = did_tx
         if fee > 0:
             chia_tx: TransactionRecord = await self.wallet_state_manager.main_wallet.create_tandem_xch_tx(
                 fee, tx_config, action_scope, extra_conditions=(vc_announcement,)
