@@ -201,9 +201,6 @@ class DAOWallet:
         )
         await self.save_info(dao_info)
 
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.extend(txs)
-
         return self, txs
 
     @staticmethod
@@ -747,7 +744,6 @@ class DAOWallet:
                 AssertCoinAnnouncement(asserted_id=launcher_coin.name(), asserted_msg=announcement_message),
             ),
         )
-        tx_record: TransactionRecord = tx_records[0]
 
         genesis_launcher_solution = Program.to([full_treasury_puzzle_hash, 1, bytes(0x80)])
 
@@ -760,8 +756,6 @@ class DAOWallet:
             uint64(launcher_coin.amount),
         )
         await self.add_parent(launcher_coin.name(), launcher_proof)
-
-        assert tx_record.spend_bundle is not None
 
         eve_coin = Coin(launcher_coin.name(), full_treasury_puzzle_hash, uint64(1))
         dao_info = DAOInfo(
@@ -780,7 +774,16 @@ class DAOWallet:
         await self.save_info(dao_info)
         eve_spend = await self.generate_treasury_eve_spend(dao_treasury_puzzle, eve_coin)
 
-        full_spend = SpendBundle.aggregate([tx_record.spend_bundle, launcher_sb, eve_spend])
+        async with action_scope.use() as interface:
+            # This should not be looked to for best practice. Ideally, the method to generate the transaction above
+            # takes a parameter to add in extra spends. That's currently out of scope, so I'm placing this hack in rn.
+            relevant_index = interface.side_effects.transactions.index(tx_records[0])
+            assert tx_records[0].spend_bundle is not None
+            new_spend = SpendBundle.aggregate([tx_records[0].spend_bundle, launcher_sb, eve_spend])
+            tx_records[0] = dataclasses.replace(
+                interface.side_effects.transactions[relevant_index], spend_bundle=new_spend, name=new_spend.name()
+            )
+            interface.side_effects.transactions[relevant_index] = tx_records[0]
 
         treasury_record = TransactionRecord(
             confirmed_at_height=uint32(0),
@@ -790,18 +793,17 @@ class DAOWallet:
             fee_amount=fee,
             confirmed=False,
             sent=uint32(10),
-            spend_bundle=full_spend,
-            additions=full_spend.additions(),
-            removals=full_spend.removals(),
+            spend_bundle=None,
+            additions=new_spend.additions(),
+            removals=new_spend.removals(),
             wallet_id=self.id(),
             sent_to=[],
             trade_id=None,
             type=uint32(TransactionType.INCOMING_TX.value),
-            name=full_spend.name(),
+            name=eve_coin.name(),
             memos=[],
             valid_times=parse_timelock_info(extra_conditions),
         )
-        regular_record = dataclasses.replace(tx_record, spend_bundle=None)
 
         funding_inner_puzhash = get_p2_singleton_puzhash(self.dao_info.treasury_id)
         await self.wallet_state_manager.add_interested_puzzle_hashes([funding_inner_puzhash], [self.id()])
@@ -811,7 +813,7 @@ class DAOWallet:
         await self.wallet_state_manager.add_interested_coin_ids([eve_coin.name()], [self.wallet_id])
         async with action_scope.use() as interface:
             interface.side_effects.transactions.append(treasury_record)
-        return [treasury_record, regular_record]
+        return [treasury_record, *tx_records]
 
     async def generate_treasury_eve_spend(
         self, inner_puz: Program, eve_coin: Coin, fee: uint64 = uint64(0)

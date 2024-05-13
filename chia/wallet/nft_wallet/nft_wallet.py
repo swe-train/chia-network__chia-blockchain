@@ -426,6 +426,7 @@ class NFTWallet:
             interface.side_effects.transactions[relevant_index] = tx_record
 
         # Create inner solution for eve spend
+        did_tx = None
         did_inner_hash = b""
         if did_id is not None:
             if did_id != b"":
@@ -451,6 +452,8 @@ class NFTWallet:
             new_did_inner_hash=did_inner_hash,
             memos=[[target_puzzle_hash]],
         )
+        if did_tx is not None:
+            txs.append(did_tx)
         return [*txs, tx_record]
 
     async def update_metadata(
@@ -1089,20 +1092,22 @@ class NFTWallet:
         extra_conditions: Tuple[Condition, ...] = tuple(),
     ) -> List[TransactionRecord]:
         self.log.debug("Setting NFT DID with parameters: nft=%s did=%s", nft_list, did_id)
-        did_inner_hash = b""
         nft_ids = []
-        nft_tx_record = []
-        spend_bundles = []
+        tx_records = []
         first = True
         for nft_coin_info in nft_list:
             nft_ids.append(nft_coin_info.nft_id)
-        if did_id != b"":
-            did_inner_hash, did_tx = await self.get_did_approval_info(
-                announcement_ids, tx_config, action_scope, bytes32(did_id)
-            )
-            assert did_tx.spend_bundle is not None
-            if len(announcement_ids) > 0:
-                spend_bundles.append(did_tx.spend_bundle)
+        if did_id != b"" and len(announcement_ids) > 0:
+            _, did_tx = await self.get_did_approval_info(announcement_ids, tx_config, action_scope, bytes32(did_id))
+            tx_records.append(did_tx)
+
+        for _, wallet in self.wallet_state_manager.wallets.items():
+            if wallet.type() == WalletType.DECENTRALIZED_ID:
+                if bytes32.fromhex(wallet.get_my_DID()) == did_id:
+                    did_inner_hash = wallet.did_info.current_inner.get_tree_hash()
+                    break
+        else:
+            raise ValueError(f"No DID wallet with id: {did_id.hex()}")
 
         for nft_coin_info in nft_list:
             unft = UncurriedNFT.uncurry(*nft_coin_info.full_puzzle.uncurry())
@@ -1111,7 +1116,7 @@ class NFTWallet:
             if not first:
                 fee = uint64(0)
                 extra_conditions = tuple()
-            nft_tx_record.extend(
+            tx_records.extend(
                 await self.generate_signed_transaction(
                     [uint64(nft_coin_info.coin.amount)],
                     puzzle_hashes_to_sign,
@@ -1126,17 +1131,7 @@ class NFTWallet:
             )
             first = False
 
-        refined_tx_list: List[TransactionRecord] = []
-        for tx in nft_tx_record:
-            if tx.spend_bundle is not None:
-                spend_bundles.append(tx.spend_bundle)
-            refined_tx_list.append(dataclasses.replace(tx, spend_bundle=None))
-
-        if len(spend_bundles) > 0:
-            spend_bundle = SpendBundle.aggregate(spend_bundles)
-            # Add all spend bundles to the first tx
-            refined_tx_list[0] = dataclasses.replace(refined_tx_list[0], spend_bundle=spend_bundle)
-        return refined_tx_list
+        return tx_records
 
     async def bulk_transfer_nft(
         self,
@@ -1197,13 +1192,11 @@ class NFTWallet:
         nft_id = unft.singleton_launcher_id
         puzzle_hashes_to_sign = [unft.p2_puzzle.get_tree_hash()]
         did_inner_hash = b""
-        additional_bundles = []
         if did_id != b"":
             did_inner_hash, did_tx = await self.get_did_approval_info(
                 [nft_id], tx_config, action_scope, bytes32(did_id)
             )
             assert did_tx.spend_bundle is not None
-            additional_bundles.append(did_tx.spend_bundle)
 
         nft_tx_record = await self.generate_signed_transaction(
             [uint64(nft_coin_info.coin.amount)],
@@ -1214,13 +1207,12 @@ class NFTWallet:
             {nft_coin_info.coin},
             new_owner=did_id,
             new_did_inner_hash=did_inner_hash,
-            additional_bundles=additional_bundles,
             extra_conditions=extra_conditions,
         )
 
         await self.update_coin_status(nft_coin_info.coin.name(), True)
         self.wallet_state_manager.state_changed("nft_coin_did_set", self.wallet_info.id)
-        return nft_tx_record
+        return [*nft_tx_record, did_tx]
 
     async def mint_from_did(
         self,
