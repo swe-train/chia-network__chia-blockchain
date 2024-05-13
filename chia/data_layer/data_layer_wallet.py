@@ -1181,7 +1181,6 @@ class DataLayerWallet:
 
         offered_launchers: List[bytes32] = [k for k, v in offer_dict.items() if v < 0 and k is not None]
         fee_left_to_pay: uint64 = fee
-        all_bundles: List[SpendBundle] = []
         all_transactions: List[TransactionRecord] = []
         for launcher in offered_launchers:
             try:
@@ -1224,12 +1223,15 @@ class DataLayerWallet:
                 txs[0].spend_bundle,
                 coin_spends=[*all_other_spends, new_spend],
             )
-            all_bundles.append(new_bundle)
             async with action_scope.use() as interface:
                 relevant_index = interface.side_effects.transactions.index(txs[0])
-                interface.side_effects.transactions[relevant_index] = dataclasses.replace(
-                    interface.side_effects.transactions[relevant_index], spend_bundle=new_bundle
+                new_tx = dataclasses.replace(
+                    interface.side_effects.transactions[relevant_index], spend_bundle=new_bundle, name=new_bundle.name()
                 )
+                interface.side_effects.transactions[relevant_index] = new_tx
+
+            all_transactions.append(new_tx)
+            all_transactions.extend(txs[1:])
 
         # create some dummy requested payments
         requested_payments = {
@@ -1238,7 +1240,14 @@ class DataLayerWallet:
             if v > 0
         }
 
-        return Offer(requested_payments, SpendBundle.aggregate(all_bundles), driver_dict), all_transactions
+        return (
+            Offer(
+                requested_payments,
+                SpendBundle.aggregate([tx.spend_bundle for tx in all_transactions if tx.spend_bundle is not None]),
+                driver_dict,
+            ),
+            all_transactions,
+        )
 
     @staticmethod
     async def finish_graftroot_solutions(offer: Offer, solver: Solver) -> Offer:
