@@ -1192,6 +1192,7 @@ class NFTWallet:
         nft_id = unft.singleton_launcher_id
         puzzle_hashes_to_sign = [unft.p2_puzzle.get_tree_hash()]
         did_inner_hash = b""
+        did_tx = None
         if did_id != b"":
             did_inner_hash, did_tx = await self.get_did_approval_info(
                 [nft_id], tx_config, action_scope, bytes32(did_id)
@@ -1212,7 +1213,11 @@ class NFTWallet:
 
         await self.update_coin_status(nft_coin_info.coin.name(), True)
         self.wallet_state_manager.state_changed("nft_coin_did_set", self.wallet_info.id)
-        return [*nft_tx_record, did_tx]
+
+        if did_tx is not None:
+            nft_tx_record.append(did_tx)
+
+        return nft_tx_record
 
     async def mint_from_did(
         self,
@@ -1498,14 +1503,23 @@ class NFTWallet:
         did_spend = make_spend(did_coin, did_full_puzzle, did_full_sol)
 
         # Collect up all the coin spends and sign them
-        list_of_coinspends = [did_spend] + intermediate_coin_spends + launcher_spends
+        list_of_coinspends = [did_spend] + intermediate_coin_spends + launcher_spends + xch_spend.coin_spends
         unsigned_spend_bundle = SpendBundle(list_of_coinspends, G2Element())
 
         # Aggregate everything into a single spend bundle
-        total_spend = SpendBundle.aggregate([unsigned_spend_bundle, xch_spend, *eve_spends])
+        async with action_scope.use() as interface:
+            # This should not be looked to for best practice. I think many of the spends generated above could call
+            # wallet methods that generate transactions and prevent most of the need for this. Refactoring this function
+            # is out of scope so for now we're using this hack.
+            relevant_index = interface.side_effects.transactions.index(eve_txs[0])
+            assert eve_txs[0].spend_bundle is not None
+            new_spend = SpendBundle.aggregate([eve_txs[0].spend_bundle, unsigned_spend_bundle])
+            eve_txs[0] = dataclasses.replace(
+                interface.side_effects.transactions[relevant_index], spend_bundle=new_spend, name=new_spend.name()
+            )
+            interface.side_effects.transactions[relevant_index] = eve_txs[0]
 
-        tx_record: TransactionRecord = dataclasses.replace(eve_txs[0], spend_bundle=total_spend)
-        return [tx_record]
+        return eve_txs
 
     async def mint_from_xch(
         self,
