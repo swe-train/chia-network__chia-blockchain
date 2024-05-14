@@ -1322,6 +1322,7 @@ class NFTWallet:
         intermediate_coin_spends = []
         launcher_spends = []
         launcher_ids = []
+        tx_list = []
         p2_inner_puzzle = await self.standard_wallet.get_new_puzzle()
         p2_inner_ph = p2_inner_puzzle.get_tree_hash()
 
@@ -1419,6 +1420,7 @@ class NFTWallet:
             eve_puzzle_announcement = [x for x in conds.as_python() if int_from_bytes(x[0]) == 62][0][1]
             assertion = std_hash(eve_fullpuz.get_tree_hash() + eve_puzzle_announcement)
             puzzle_assertions.add(assertion)
+            tx_list.extend(eve_txs)
 
         # We've now created all the intermediate, launcher, eve and transfer spends.
         # Create the xch spend to fund the minting.
@@ -1509,15 +1511,15 @@ class NFTWallet:
             # This should not be looked to for best practice. I think many of the spends generated above could call
             # wallet methods that generate transactions and prevent most of the need for this. Refactoring this function
             # is out of scope so for now we're using this hack.
-            relevant_index = interface.side_effects.transactions.index(eve_txs[0])
-            assert eve_txs[0].spend_bundle is not None
-            new_spend = SpendBundle.aggregate([eve_txs[0].spend_bundle, unsigned_spend_bundle])
-            eve_txs[0] = dataclasses.replace(
+            relevant_index = interface.side_effects.transactions.index(tx_list[0])
+            assert tx_list[0].spend_bundle is not None
+            new_spend = SpendBundle.aggregate([tx_list[0].spend_bundle, unsigned_spend_bundle])
+            tx_list[0] = dataclasses.replace(
                 interface.side_effects.transactions[relevant_index], spend_bundle=new_spend, name=new_spend.name()
             )
-            interface.side_effects.transactions[relevant_index] = eve_txs[0]
+            interface.side_effects.transactions[relevant_index] = tx_list[0]
 
-        return eve_txs
+        return tx_list
 
     async def mint_from_xch(
         self,
@@ -1579,6 +1581,7 @@ class NFTWallet:
         intermediate_coin_spends = []
         launcher_spends = []
         launcher_ids = []
+        tx_list = []
         p2_inner_puzzle = await self.standard_wallet.get_new_puzzle()
         p2_inner_ph = p2_inner_puzzle.get_tree_hash()
 
@@ -1671,6 +1674,7 @@ class NFTWallet:
             eve_puzzle_announcement = [x for x in conds.as_python() if int_from_bytes(x[0]) == 62][0][1]
             assertion = std_hash(eve_fullpuz.get_tree_hash() + eve_puzzle_announcement)
             puzzle_assertions.add(assertion)
+            tx_list.extend(eve_txs)
 
         # We've now created all the intermediate, launcher, eve and transfer spends.
         # Create the xch spend to fund the minting.
@@ -1714,15 +1718,15 @@ class NFTWallet:
             # This should not be looked to for best practice. I think many of the spends generated above could call
             # wallet methods that generate transactions and prevent most of the need for this. Refactoring this function
             # is out of scope so for now we're using this hack.
-            relevant_index = interface.side_effects.transactions.index(eve_txs[0])
-            assert eve_txs[0].spend_bundle is not None
-            new_spend = SpendBundle.aggregate([eve_txs[0].spend_bundle, unsigned_spend_bundle])
-            eve_txs[0] = dataclasses.replace(
+            relevant_index = interface.side_effects.transactions.index(tx_list[0])
+            assert tx_list[0].spend_bundle is not None
+            new_spend = SpendBundle.aggregate([tx_list[0].spend_bundle, unsigned_spend_bundle])
+            tx_list[0] = dataclasses.replace(
                 interface.side_effects.transactions[relevant_index], spend_bundle=new_spend, name=new_spend.name()
             )
-            interface.side_effects.transactions[relevant_index] = eve_txs[0]
+            interface.side_effects.transactions[relevant_index] = tx_list[0]
 
-        return eve_txs
+        return tx_list
 
     async def select_coins(
         self,
