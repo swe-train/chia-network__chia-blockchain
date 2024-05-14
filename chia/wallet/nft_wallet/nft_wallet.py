@@ -1322,7 +1322,6 @@ class NFTWallet:
         intermediate_coin_spends = []
         launcher_spends = []
         launcher_ids = []
-        eve_spends: List[SpendBundle] = []
         p2_inner_puzzle = await self.standard_wallet.get_new_puzzle()
         p2_inner_ph = p2_inner_puzzle.get_tree_hash()
 
@@ -1414,7 +1413,6 @@ class NFTWallet:
             )
             eve_sb = eve_txs[0].spend_bundle
             assert eve_sb is not None
-            eve_spends.append(eve_sb)
             # Extract Puzzle Announcement from eve spend
             eve_sol = eve_sb.coin_spends[0].solution.to_program()
             conds = eve_fullpuz.run(eve_sol)
@@ -1581,7 +1579,6 @@ class NFTWallet:
         intermediate_coin_spends = []
         launcher_spends = []
         launcher_ids = []
-        eve_spends: List[SpendBundle] = []
         p2_inner_puzzle = await self.standard_wallet.get_new_puzzle()
         p2_inner_ph = p2_inner_puzzle.get_tree_hash()
 
@@ -1668,7 +1665,6 @@ class NFTWallet:
             )
             eve_sb = eve_txs[0].spend_bundle
             assert eve_sb is not None
-            eve_spends.append(eve_sb)
             # Extract Puzzle Announcement from eve spend
             eve_sol = eve_sb.coin_spends[0].solution.to_program()
             conds = eve_fullpuz.run(eve_sol)
@@ -1708,16 +1704,25 @@ class NFTWallet:
             else:
                 solution = self.standard_wallet.make_solution(primaries=[], conditions=(primary_announcement,))
             xch_spends.append(make_spend(xch_coin, puzzle, solution))
-        xch_spend = SpendBundle(xch_spends, G2Element())
 
-        # Collect up all the coin spends
-        list_of_coinspends = intermediate_coin_spends + launcher_spends
+        # Collect up all the coin spends and sign them
+        list_of_coinspends = intermediate_coin_spends + launcher_spends + xch_spends
         unsigned_spend_bundle = SpendBundle(list_of_coinspends, G2Element())
 
         # Aggregate everything into a single spend bundle
-        total_spend = SpendBundle.aggregate([unsigned_spend_bundle, xch_spend, *eve_spends])
-        tx_record: TransactionRecord = dataclasses.replace(eve_txs[0], spend_bundle=total_spend)
-        return [tx_record]
+        async with action_scope.use() as interface:
+            # This should not be looked to for best practice. I think many of the spends generated above could call
+            # wallet methods that generate transactions and prevent most of the need for this. Refactoring this function
+            # is out of scope so for now we're using this hack.
+            relevant_index = interface.side_effects.transactions.index(eve_txs[0])
+            assert eve_txs[0].spend_bundle is not None
+            new_spend = SpendBundle.aggregate([eve_txs[0].spend_bundle, unsigned_spend_bundle])
+            eve_txs[0] = dataclasses.replace(
+                interface.side_effects.transactions[relevant_index], spend_bundle=new_spend, name=new_spend.name()
+            )
+            interface.side_effects.transactions[relevant_index] = eve_txs[0]
+
+        return eve_txs
 
     async def select_coins(
         self,

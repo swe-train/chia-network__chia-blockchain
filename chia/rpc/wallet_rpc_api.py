@@ -3768,19 +3768,15 @@ class WalletRpcApi:
                 action_scope=action_scope,
                 extra_conditions=extra_conditions,
             )
-        sb = txs[0].spend_bundle
-        assert sb is not None
+        sb = SpendBundle.aggregate([tx.spend_bundle for tx in txs if tx.spend_bundle is not None])
         nft_id_list = []
         for cs in sb.coin_spends:
             if cs.coin.puzzle_hash == nft_puzzles.LAUNCHER_PUZZLE_HASH:
                 nft_id_list.append(encode_puzzle_hash(cs.coin.name(), AddressType.NFT.hrp(self.service.config)))
-        ###
-        # Temporary signing workaround (delete when minting functions return transaction records)
-        sb, _ = await self.service.wallet_state_manager.sign_bundle(sb.coin_spends)
-        ###
+
         return {
             "success": True,
-            "spend_bundle": sb,
+            "spend_bundle": None,  # tx_endpoint wrapper will take care of this
             "nft_id_list": nft_id_list,
             "transactions": [tx.to_json_dict_convenience(self.service.config) for tx in txs],
         }
