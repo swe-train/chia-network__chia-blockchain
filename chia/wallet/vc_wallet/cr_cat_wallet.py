@@ -89,6 +89,7 @@ class CRCATWallet(CATWallet):
         action_scope: WalletActionScope,
         fee: uint64 = uint64(0),
         name: Optional[str] = None,
+        push: bool = False,
     ) -> Tuple[CATWallet, List[TransactionRecord]]:  # pragma: no cover
         raise NotImplementedError("create_new_cat_wallet is a legacy method and is not available on CR-CAT wallets")
 

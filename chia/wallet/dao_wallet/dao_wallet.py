@@ -689,7 +689,7 @@ class DAOWallet:
                 "treasury_id": launcher_coin.name(),
                 "coins": different_coins,
             }
-            new_cat_wallet, _ = await CATWallet.create_new_cat_wallet(
+            new_cat_wallet, cat_txs = await CATWallet.create_new_cat_wallet(
                 self.wallet_state_manager,
                 self.standard_wallet,
                 cat_tail_info,
@@ -697,6 +697,7 @@ class DAOWallet:
                 DEFAULT_TX_CONFIG,
                 action_scope,
                 fee=fee_for_cat,
+                push=False,
             )
             assert new_cat_wallet is not None
         else:  # pragma: no cover
@@ -813,7 +814,7 @@ class DAOWallet:
         await self.wallet_state_manager.add_interested_coin_ids([eve_coin.name()], [self.wallet_id])
         async with action_scope.use() as interface:
             interface.side_effects.transactions.append(treasury_record)
-        return [treasury_record, *tx_records]
+        return [treasury_record, *tx_records, *cat_txs]
 
     async def generate_treasury_eve_spend(
         self, inner_puz: Program, eve_coin: Coin, fee: uint64 = uint64(0)
@@ -1582,8 +1583,6 @@ class DAOWallet:
                 fee=fee,
                 extra_conditions=extra_conditions,
             )
-            async with action_scope.use() as interface:
-                interface.side_effects.transactions.extend(tx_records)
             return tx_records
         else:  # pragma: no cover
             raise ValueError(f"Assets of type {funding_wallet.type()} are not currently supported.")
@@ -1602,8 +1601,7 @@ class DAOWallet:
         tx_record = await self._create_treasury_fund_transaction(
             funding_wallet, amount, tx_config, action_scope, fee, extra_conditions=extra_conditions
         )
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.append(tx_record[0])
+
         return tx_record[0]
 
     async def fetch_singleton_lineage_proof(self, coin: Coin) -> LineageProof:

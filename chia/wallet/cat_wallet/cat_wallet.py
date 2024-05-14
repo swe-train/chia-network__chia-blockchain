@@ -113,6 +113,7 @@ class CATWallet:
         action_scope: WalletActionScope,
         fee: uint64 = uint64(0),
         name: Optional[str] = None,
+        push: bool = True,
     ) -> Tuple[CATWallet, List[TransactionRecord]]:
         self = CATWallet()
         self.standard_wallet = wallet
@@ -186,19 +187,22 @@ class CATWallet:
             fee_amount=fee,
             confirmed=False,
             sent=uint32(10),
-            spend_bundle=None,
+            spend_bundle=spend_bundle,
             additions=[cat_coin],
             removals=list(filter(lambda rem: rem.name() == cat_pid, spend_bundle.removals())),
             wallet_id=self.id(),
             sent_to=[],
             trade_id=None,
             type=uint32(TransactionType.INCOMING_TX.value),
-            name=bytes32.secret(),
+            name=spend_bundle.name(),
             memos=[],
             valid_times=ConditionValidTimes(),
         )
-        chia_tx = dataclasses.replace(chia_tx, spend_bundle=spend_bundle, name=spend_bundle.name())
-        tx_list = await self.wallet_state_manager.add_pending_transactions([chia_tx, cat_record])
+        tx_list = [chia_tx, cat_record]
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(cat_record)
+        if push:
+            tx_list = await self.wallet_state_manager.add_pending_transactions(tx_list)
         return self, tx_list
 
     @staticmethod

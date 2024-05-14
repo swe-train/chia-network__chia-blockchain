@@ -2687,6 +2687,7 @@ async def test_dao_concurrency(self_hostname: str, three_wallet_nodes: OldSimula
     [True, False],
 )
 @pytest.mark.anyio
+@pytest.mark.standard_block_tools
 async def test_dao_cat_exits(
     two_wallet_nodes_services: SimulatorsAndWalletsServices, trusted: bool, self_hostname: str
 ) -> None:
@@ -2769,8 +2770,7 @@ async def test_dao_cat_exits(
         cat_wallet_0 = wallet_node_0.wallet_state_manager.wallets[dao_wallet_dict_0["cat_wallet_id"]]
         dao_cat_wallet_0 = wallet_node_0.wallet_state_manager.wallets[dao_wallet_dict_0["dao_cat_wallet_id"]]
         txs = await wallet_0.wallet_state_manager.tx_store.get_all_unconfirmed()
-        for tx in txs:
-            await full_node_api.wait_transaction_records_entered_mempool(records=[tx], timeout=60)
+        await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
         await full_node_api.process_transaction_records(records=txs, timeout=60)
         await full_node_api.process_all_wallet_transactions(wallet_0, 60)
         await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1], timeout=30)
