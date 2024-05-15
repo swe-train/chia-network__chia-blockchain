@@ -348,6 +348,7 @@ class VCWallet:
             memos=list(compute_memos(spend_bundle).items()),
             valid_times=parse_timelock_info(extra_conditions),
         )
+        tx_list.append(tx)
         async with action_scope.use() as interface:
             interface.side_effects.transactions.append(tx)
         return tx_list

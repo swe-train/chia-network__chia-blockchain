@@ -1121,8 +1121,11 @@ class DAOWallet:
             ]
         )
         full_proposal_puzzle = curry_singleton(proposal_id, proposal_info.current_innerpuz)
-        list_of_coinspends = [make_spend(proposal_info.current_coin, full_proposal_puzzle, fullsol)]
-        unsigned_spend_bundle = SpendBundle(list_of_coinspends, G2Element())
+        list_of_coinspends = [
+            make_spend(proposal_info.current_coin, full_proposal_puzzle, fullsol),
+            *dao_cat_spend.coin_spends,
+        ]
+        spend_bundle = SpendBundle(list_of_coinspends, G2Element())
         if fee > 0:
             chia_tx = await self.standard_wallet.create_tandem_xch_tx(
                 fee,
@@ -1130,9 +1133,6 @@ class DAOWallet:
                 action_scope,
             )
             assert chia_tx.spend_bundle is not None
-            spend_bundle = unsigned_spend_bundle.aggregate([unsigned_spend_bundle, dao_cat_spend, chia_tx.spend_bundle])
-        else:
-            spend_bundle = unsigned_spend_bundle.aggregate([unsigned_spend_bundle, dao_cat_spend])
 
         record = TransactionRecord(
             confirmed_at_height=uint32(0),
