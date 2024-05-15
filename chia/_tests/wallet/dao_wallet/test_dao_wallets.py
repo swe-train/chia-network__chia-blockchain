@@ -378,11 +378,11 @@ async def test_dao_funding(self_hostname: str, three_wallet_nodes: OldSimulators
         [None],
     )
     async with dao_wallet_0.wallet_state_manager.new_action_scope(push=False) as action_scope:
-        [proposal_tx] = await dao_wallet_0.generate_new_proposal(
+        txs = await dao_wallet_0.generate_new_proposal(
             xch_proposal_inner, DEFAULT_TX_CONFIG, action_scope, dao_cat_0_bal
         )
-    [proposal_tx] = await dao_wallet_0.wallet_state_manager.add_pending_transactions([proposal_tx])
-    await full_node_api.wait_transaction_records_entered_mempool(records=[proposal_tx], timeout=60)
+    txs = await dao_wallet_0.wallet_state_manager.add_pending_transactions(txs)
+    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1], timeout=30)
 
@@ -609,11 +609,11 @@ async def test_dao_proposals(self_hostname: str, three_wallet_nodes: OldSimulato
         [None],
     )
     async with dao_wallet_0.wallet_state_manager.new_action_scope(push=False) as action_scope:
-        [proposal_tx] = await dao_wallet_0.generate_new_proposal(
+        txs = await dao_wallet_0.generate_new_proposal(
             xch_proposal_inner, DEFAULT_TX_CONFIG, action_scope, dao_cat_0_bal, fee=base_fee
         )
-    [proposal_tx] = await wallet_0.wallet_state_manager.add_pending_transactions([proposal_tx])
-    await full_node_api.wait_transaction_records_entered_mempool(records=[proposal_tx], timeout=60)
+    txs = await wallet_0.wallet_state_manager.add_pending_transactions(txs)
+    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1, wallet_node_2], timeout=30)
 
@@ -632,11 +632,11 @@ async def test_dao_proposals(self_hostname: str, three_wallet_nodes: OldSimulato
     )
 
     async with dao_wallet_0.wallet_state_manager.new_action_scope(push=False) as action_scope:
-        [proposal_tx] = await dao_wallet_0.generate_new_proposal(
+        txs = await dao_wallet_0.generate_new_proposal(
             mint_proposal_inner, DEFAULT_TX_CONFIG, action_scope, vote_amount=dao_cat_0_bal, fee=base_fee
         )
-    [proposal_tx] = await wallet_0.wallet_state_manager.add_pending_transactions([proposal_tx])
-    await full_node_api.wait_transaction_records_entered_mempool(records=[proposal_tx], timeout=60)
+    txs = await wallet_0.wallet_state_manager.add_pending_transactions(txs)
+    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1, wallet_node_2], timeout=30)
 
@@ -657,11 +657,11 @@ async def test_dao_proposals(self_hostname: str, three_wallet_nodes: OldSimulato
     assert current_innerpuz is not None
     update_inner = await generate_update_proposal_innerpuz(current_innerpuz, new_dao_rules)
     async with dao_wallet_0.wallet_state_manager.new_action_scope(push=False) as action_scope:
-        [proposal_tx] = await dao_wallet_0.generate_new_proposal(
+        txs = await dao_wallet_0.generate_new_proposal(
             update_inner, DEFAULT_TX_CONFIG, action_scope, dao_cat_0_bal, fee=base_fee
         )
-    [proposal_tx] = await wallet_0.wallet_state_manager.add_pending_transactions([proposal_tx])
-    await full_node_api.wait_transaction_records_entered_mempool(records=[proposal_tx], timeout=60)
+    txs = await wallet_0.wallet_state_manager.add_pending_transactions(txs)
+    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1, wallet_node_2], timeout=30)
 
@@ -674,11 +674,11 @@ async def test_dao_proposals(self_hostname: str, three_wallet_nodes: OldSimulato
         treasury_id, [recipient_puzzle_hash], [proposal_amount_2], [None]
     )
     async with dao_wallet_0.wallet_state_manager.new_action_scope(push=False) as action_scope:
-        [proposal_tx] = await dao_wallet_0.generate_new_proposal(
+        txs = await dao_wallet_0.generate_new_proposal(
             xch_proposal_inner, DEFAULT_TX_CONFIG, action_scope, dao_cat_0_bal, fee=base_fee
         )
-    [proposal_tx] = await wallet_0.wallet_state_manager.add_pending_transactions([proposal_tx])
-    await full_node_api.wait_transaction_records_entered_mempool(records=[proposal_tx], timeout=60)
+    txs = await wallet_0.wallet_state_manager.add_pending_transactions(txs)
+    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1, wallet_node_2], timeout=30)
 
@@ -688,11 +688,11 @@ async def test_dao_proposals(self_hostname: str, three_wallet_nodes: OldSimulato
     # Proposal 4: Create a 'bad' proposal (can't be executed, must be force-closed)
     xch_proposal_inner = Program.to(["x"])
     async with dao_wallet_0.wallet_state_manager.new_action_scope(push=False) as action_scope:
-        [proposal_tx] = await dao_wallet_0.generate_new_proposal(
+        txs = await dao_wallet_0.generate_new_proposal(
             xch_proposal_inner, DEFAULT_TX_CONFIG, action_scope, dao_cat_0_bal, fee=base_fee
         )
-    [proposal_tx] = await wallet_0.wallet_state_manager.add_pending_transactions([proposal_tx])
-    await full_node_api.wait_transaction_records_entered_mempool(records=[proposal_tx], timeout=60)
+    txs = await wallet_0.wallet_state_manager.add_pending_transactions(txs)
+    await full_node_api.wait_transaction_records_entered_mempool(records=txs, timeout=60)
     await full_node_api.process_all_wallet_transactions(wallet_0, timeout=60)
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1, wallet_node_2], timeout=30)
 
@@ -1061,15 +1061,11 @@ async def test_dao_proposal_partial_vote(
 
     vote_amount = dao_cat_0_bal - 10
     async with dao_wallet_0.wallet_state_manager.new_action_scope(push=False) as action_scope:
-        [proposal_tx] = await dao_wallet_0.generate_new_proposal(
+        txs = await dao_wallet_0.generate_new_proposal(
             mint_proposal_inner, DEFAULT_TX_CONFIG, action_scope, vote_amount=vote_amount, fee=uint64(1000)
         )
-    [proposal_tx] = await dao_wallet_0.wallet_state_manager.add_pending_transactions([proposal_tx])
-    assert isinstance(proposal_tx, TransactionRecord)
-    proposal_sb = proposal_tx.spend_bundle
-    assert proposal_sb is not None
-    await time_out_assert_not_none(5, full_node_api.full_node.mempool_manager.get_spendbundle, proposal_sb.name())
-    await full_node_api.process_spend_bundles(bundles=[proposal_sb])
+    txs = await dao_wallet_0.wallet_state_manager.add_pending_transactions(txs)
+    await full_node_api.wait_transaction_records_entered_mempool(records=txs)
     await full_node_api.farm_new_transaction_block(FarmNewBlockProtocol(puzzle_hash_0))
     await full_node_api.wait_for_wallets_synced(wallet_nodes=[wallet_node_0, wallet_node_1], timeout=30)
 

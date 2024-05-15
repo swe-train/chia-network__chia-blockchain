@@ -6,7 +6,7 @@ import time
 import traceback
 from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Tuple, cast
 
-from chia_rs import G1Element, G2Element
+from chia_rs import G1Element
 from typing_extensions import Unpack
 
 from chia.consensus.default_constants import DEFAULT_CONSTANTS
@@ -749,19 +749,8 @@ class CATWallet:
             spendable_cat_list.append(new_spendable_cat)
 
         cat_spend_bundle = unsigned_spend_bundle_for_spendable_cats(CAT_MOD, spendable_cat_list)
-        chia_spend_bundle = SpendBundle([], G2Element())
-        if chia_tx is not None and chia_tx.spend_bundle is not None:
-            chia_spend_bundle = chia_tx.spend_bundle
 
-        return (
-            SpendBundle.aggregate(
-                [
-                    cat_spend_bundle,
-                    chia_spend_bundle,
-                ]
-            ),
-            chia_tx,
-        )
+        return (cat_spend_bundle, chia_tx)
 
     async def generate_signed_transaction(
         self,
@@ -827,27 +816,7 @@ class CATWallet:
         tx_list = [tx]
 
         if chia_tx is not None:
-            tx_list.append(
-                TransactionRecord(
-                    confirmed_at_height=chia_tx.confirmed_at_height,
-                    created_at_time=chia_tx.created_at_time,
-                    to_puzzle_hash=chia_tx.to_puzzle_hash,
-                    amount=chia_tx.amount,
-                    fee_amount=chia_tx.fee_amount,
-                    confirmed=chia_tx.confirmed,
-                    sent=chia_tx.sent,
-                    spend_bundle=None,
-                    additions=chia_tx.additions,
-                    removals=chia_tx.removals,
-                    wallet_id=chia_tx.wallet_id,
-                    sent_to=chia_tx.sent_to,
-                    trade_id=chia_tx.trade_id,
-                    type=chia_tx.type,
-                    name=chia_tx.name,
-                    memos=[],
-                    valid_times=parse_timelock_info(extra_conditions),
-                )
-            )
+            tx_list.append(chia_tx)
 
         async with action_scope.use() as interface:
             interface.side_effects.transactions.append(tx)
