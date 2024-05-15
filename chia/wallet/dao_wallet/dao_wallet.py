@@ -913,7 +913,6 @@ class DAOWallet:
                 AssertCoinAnnouncement(asserted_id=launcher_coin.name(), asserted_msg=announcement_message),
             ),
         )
-        tx_record: TransactionRecord = tx_records[0]
 
         genesis_launcher_solution = Program.to(
             [full_proposal_puzzle_hash, dao_rules.proposal_minimum_amount, bytes(0x80)]
@@ -945,10 +944,8 @@ class DAOWallet:
             launcher_coin=launcher_coin,
             vote_amount=vote_amount,
         )
-        assert tx_record
-        assert tx_record.spend_bundle is not None
 
-        full_spend = SpendBundle.aggregate([tx_record.spend_bundle, eve_spend, launcher_sb])
+        full_spend = SpendBundle.aggregate([eve_spend, launcher_sb])
 
         record = TransactionRecord(
             confirmed_at_height=uint32(0),
@@ -971,7 +968,7 @@ class DAOWallet:
         )
         async with action_scope.use() as interface:
             interface.side_effects.transactions.append(record)
-        return [record]
+        return [record, *tx_records]
 
     async def generate_proposal_eve_spend(
         self,
@@ -1492,11 +1489,8 @@ class DAOWallet:
         else:
             spend_bundle = SpendBundle([proposal_cs, timer_cs, treasury_cs], AugSchemeMPL.aggregate([]))
         if fee > 0:
-            chia_tx = await self.standard_wallet.create_tandem_xch_tx(fee, tx_config, action_scope)
-            assert chia_tx.spend_bundle is not None
-            full_spend = SpendBundle.aggregate([spend_bundle, chia_tx.spend_bundle])
-        else:
-            full_spend = SpendBundle.aggregate([spend_bundle])
+            await self.standard_wallet.create_tandem_xch_tx(fee, tx_config, action_scope)
+        full_spend = spend_bundle
         if cat_spend_bundle is not None:
             full_spend = full_spend.aggregate([full_spend, cat_spend_bundle])
         if delegated_puzzle_sb is not None:

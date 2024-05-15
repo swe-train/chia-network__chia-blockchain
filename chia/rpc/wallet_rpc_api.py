@@ -2973,7 +2973,7 @@ class WalletRpcApi:
 
         vote_amount = request.get("vote_amount")
         fee = uint64(request.get("fee", 0))
-        [proposal_tx] = await dao_wallet.generate_new_proposal(
+        txs = await dao_wallet.generate_new_proposal(
             proposed_puzzle,
             tx_config,
             action_scope,
@@ -2981,9 +2981,8 @@ class WalletRpcApi:
             fee=fee,
             extra_conditions=extra_conditions,
         )
-        assert proposal_tx is not None
-        assert isinstance(proposal_tx.removals, List)
-        for coin in proposal_tx.removals:
+        assert isinstance(txs[0].removals, List)
+        for coin in txs[0].removals:
             if coin.puzzle_hash == SINGLETON_LAUNCHER_PUZZLE_HASH:
                 proposal_id = coin.name()
                 break
@@ -2992,9 +2991,9 @@ class WalletRpcApi:
         return {
             "success": True,
             "proposal_id": proposal_id,
-            "tx_id": proposal_tx.name.hex(),
-            "tx": proposal_tx,
-            "transactions": [proposal_tx.to_json_dict_convenience(self.service.config)],
+            "tx_id": txs[0].name.hex(),
+            "tx": txs[0],
+            "transactions": [tx.to_json_dict_convenience(self.service.config) for tx in txs],
         }
 
     @tx_endpoint(push=True)
