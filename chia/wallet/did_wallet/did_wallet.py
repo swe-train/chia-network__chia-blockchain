@@ -646,9 +646,7 @@ class DIDWallet:
             )
         else:
             chia_tx = None
-        if chia_tx is not None and chia_tx.spend_bundle is not None:
-            spend_bundle = SpendBundle.aggregate([spend_bundle, chia_tx.spend_bundle])
-            chia_tx = dataclasses.replace(chia_tx, spend_bundle=None)
+
         did_record = TransactionRecord(
             confirmed_at_height=uint32(0),
             created_at_time=uint64(int(time.time())),
@@ -672,6 +670,9 @@ class DIDWallet:
         txs = [did_record]
         if chia_tx is not None:
             txs.append(chia_tx)
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(did_record)
 
         return txs
 
@@ -747,9 +748,7 @@ class DIDWallet:
             )
         else:
             chia_tx = None
-        if chia_tx is not None and chia_tx.spend_bundle is not None:
-            spend_bundle = SpendBundle.aggregate([spend_bundle, chia_tx.spend_bundle])
-            chia_tx = dataclasses.replace(chia_tx, spend_bundle=None)
+
         did_record = TransactionRecord(
             confirmed_at_height=uint32(0),
             created_at_time=uint64(int(time.time())),
@@ -772,6 +771,10 @@ class DIDWallet:
         txs = [did_record]
         if chia_tx is not None:
             txs.append(chia_tx)
+
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.append(did_record)
+
         return txs
 
     # The message spend can tests\wallet\rpc\test_wallet_rpc.py send messages and also change your innerpuz

@@ -245,7 +245,6 @@ class TradeManager:
         """This will create a transaction that includes coins that were offered"""
 
         all_txs: List[TransactionRecord] = []
-        bundles: List[SpendBundle] = []
         fee_to_pay: uint64 = fee
         for trade_id in trades:
             if trade_id in trade_cache:
@@ -299,9 +298,8 @@ class TradeManager:
                         extra_conditions=extra_conditions,
                     )
                     if tx is not None and tx.spend_bundle is not None:
-                        bundles.append(tx.spend_bundle)
                         cancellation_additions.extend(tx.spend_bundle.additions())
-                        all_txs.append(dataclasses.replace(tx, spend_bundle=None))
+                        all_txs.append(dataclasses.replace(tx, fee_amount=fee))
                 else:
                     # ATTENTION: new_wallets
                     txs = await wallet.generate_signed_transaction(
@@ -317,40 +315,36 @@ class TradeManager:
                     )
                     for tx in txs:
                         if tx is not None and tx.spend_bundle is not None:
-                            bundles.append(tx.spend_bundle)
                             cancellation_additions.extend(tx.spend_bundle.additions())
-                            all_txs.append(dataclasses.replace(tx, spend_bundle=None))
+                        all_txs.append(dataclasses.replace(tx, fee_amount=fee))
                 fee_to_pay = uint64(0)
                 extra_conditions = tuple()
 
-                all_txs.append(
-                    TransactionRecord(
-                        confirmed_at_height=uint32(0),
-                        created_at_time=uint64(int(time.time())),
-                        to_puzzle_hash=new_ph,
-                        amount=uint64(coin.amount),
-                        fee_amount=fee,
-                        confirmed=False,
-                        sent=uint32(10),
-                        spend_bundle=None,
-                        additions=cancellation_additions,
-                        removals=[coin],
-                        wallet_id=wallet.id(),
-                        sent_to=[],
-                        trade_id=None,
-                        type=uint32(TransactionType.INCOMING_TX.value),
-                        name=cancellation_additions[0].name(),
-                        memos=[],
-                        valid_times=valid_times,
-                    )
+                incoming_tx = TransactionRecord(
+                    confirmed_at_height=uint32(0),
+                    created_at_time=uint64(int(time.time())),
+                    to_puzzle_hash=new_ph,
+                    amount=uint64(coin.amount),
+                    fee_amount=fee,
+                    confirmed=False,
+                    sent=uint32(10),
+                    spend_bundle=None,
+                    additions=cancellation_additions,
+                    removals=[coin],
+                    wallet_id=wallet.id(),
+                    sent_to=[],
+                    trade_id=None,
+                    type=uint32(TransactionType.INCOMING_TX.value),
+                    name=cancellation_additions[0].name(),
+                    memos=[],
+                    valid_times=valid_times,
                 )
+                all_txs.append(incoming_tx)
+
+                async with action_scope.use() as interface:
+                    interface.side_effects.transactions.append(incoming_tx)
 
             await self.trade_store.set_status(trade_id, TradeStatus.PENDING_CANCEL)
-        # Aggregate spend bundles to the first tx
-        if len(all_txs) > 0:
-            all_txs[0] = dataclasses.replace(all_txs[0], spend_bundle=SpendBundle.aggregate(bundles))
-
-        all_txs = [dataclasses.replace(tx, fee_amount=fee) for tx in all_txs]
 
         return all_txs
 
@@ -419,9 +413,6 @@ class TradeManager:
 
         if success is True and trade_offer is not None and not validate_only:
             await self.save_trade(trade_offer, created_offer)
-
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.extend(tx_records)
 
         return success, trade_offer, tx_records, error
 
