@@ -195,7 +195,7 @@ def tx_endpoint(
                     or func.__name__ == "pw_absorb_rewards"
                 ):
                     # Theses RPCs return not "convenience" for some reason
-                    response["transaction"] = new_txs[len(new_txs) - 1].to_json_dict()
+                    response["transaction"] = new_txs[-1].to_json_dict()
                 else:
                     response["transaction"] = response["transactions"][0]
             if "tx_record" in response:

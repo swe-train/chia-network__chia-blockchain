@@ -394,9 +394,7 @@ class DataLayerWallet:
             negative_change_allowed=False,
             extra_conditions=(announcement_to_assert,),
         )
-        assert chia_tx.spend_bundle is not None
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.append(chia_tx)
+
         return chia_tx
 
     async def create_update_state_spend(
@@ -748,10 +746,6 @@ class DataLayerWallet:
             memos=[launcher_id, *(url for url in urls)],
             extra_conditions=extra_conditions,
         )
-        assert create_mirror_tx_record.spend_bundle is not None
-
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.append(create_mirror_tx_record)
 
         return [create_mirror_tx_record]
 
@@ -819,6 +813,9 @@ class DataLayerWallet:
             )
         ]
 
+        async with action_scope.use() as interface:
+            interface.side_effects.transactions.extend(txs)
+
         if excess_fee > 0:
             [chia_tx] = await self.wallet_state_manager.main_wallet.generate_signed_transaction(
                 uint64(1),
@@ -828,17 +825,7 @@ class DataLayerWallet:
                 fee=uint64(excess_fee),
                 extra_conditions=(AssertCoinAnnouncement(asserted_id=mirror_coin.name(), asserted_msg=b"$"),),
             )
-            assert txs[0].spend_bundle is not None
-            assert chia_tx.spend_bundle is not None
-            txs = [
-                dataclasses.replace(
-                    txs[0], spend_bundle=SpendBundle.aggregate([txs[0].spend_bundle, chia_tx.spend_bundle])
-                ),
-                dataclasses.replace(chia_tx, spend_bundle=None),
-            ]
-
-        async with action_scope.use() as interface:
-            interface.side_effects.transactions.extend(txs)
+            txs.append(chia_tx)
 
         return txs
 
