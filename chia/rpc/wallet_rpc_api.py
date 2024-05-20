@@ -2037,17 +2037,16 @@ class WalletRpcApi:
         else:
             solver = Solver(info=maybe_marshalled_solver)
 
-        async with self.service.wallet_state_manager.new_action_scope(push=False) as action_scope:
-            peer = self.service.get_full_node_peer()
-            trade_record, tx_records = await self.service.wallet_state_manager.trade_manager.respond_to_offer(
-                offer,
-                peer,
-                tx_config,
-                action_scope,
-                fee=fee,
-                solver=solver,
-                extra_conditions=extra_conditions,
-            )
+        peer = self.service.get_full_node_peer()
+        trade_record, tx_records = await self.service.wallet_state_manager.trade_manager.respond_to_offer(
+            offer,
+            peer,
+            tx_config,
+            action_scope,
+            fee=fee,
+            solver=solver,
+            extra_conditions=extra_conditions,
+        )
 
         return {
             "trade_record": trade_record.to_json_dict_convenience(),

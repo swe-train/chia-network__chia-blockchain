@@ -335,7 +335,7 @@ class TradeManager:
                     )
                     if tx is not None and tx.spend_bundle is not None:
                         cancellation_additions.extend(tx.spend_bundle.additions())
-                        all_txs.append(dataclasses.replace(tx, fee_amount=fee))
+                        all_txs.append(tx)
                 else:
                     # ATTENTION: new_wallets
                     txs = await wallet.generate_signed_transaction(
@@ -352,7 +352,7 @@ class TradeManager:
                     for tx in txs:
                         if tx is not None and tx.spend_bundle is not None:
                             cancellation_additions.extend(tx.spend_bundle.additions())
-                        all_txs.append(dataclasses.replace(tx, fee_amount=fee))
+                        all_txs.append(tx)
                 fee_to_pay = uint64(0)
                 extra_conditions = tuple()
 
@@ -377,9 +377,24 @@ class TradeManager:
                 )
                 all_txs.append(incoming_tx)
 
-                async with action_scope.use() as interface:
-                    interface.side_effects.transactions.append(incoming_tx)
             await self.trade_store.set_status(trade.trade_id, TradeStatus.PENDING_CANCEL)
+
+        if secure:
+            async with action_scope.use() as interface:
+                # We have to combine the spend bundle for these since they are tied with announcements
+                all_tx_names = [tx.name for tx in all_txs]
+                interface.side_effects.transactions = [
+                    tx for tx in interface.side_effects.transactions if tx.name not in all_tx_names
+                ]
+                final_spend_bundle = SpendBundle.aggregate(
+                    [tx.spend_bundle for tx in all_txs if tx.spend_bundle is not None]
+                )
+                interface.side_effects.transactions.append(
+                    dataclasses.replace(all_txs[0], spend_bundle=final_spend_bundle, name=final_spend_bundle.name())
+                )
+                interface.side_effects.transactions.extend(
+                    [dataclasses.replace(tx, spend_bundle=None, fee_amount=fee) for tx in all_txs[1:]]
+                )
 
         return all_txs
 

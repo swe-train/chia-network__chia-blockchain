@@ -566,7 +566,7 @@ async def test_create_signed_transaction(
         push=True,
     )
     change_expected = not selected_coin or selected_coin[0].amount - amount_total > 0
-    assert_tx_amounts(txs[1], outputs, amount_fee=amount_fee, change_expected=change_expected, is_cat=is_cat)
+    assert_tx_amounts(txs[-1], outputs, amount_fee=amount_fee, change_expected=change_expected, is_cat=is_cat)
 
     # Farm the transaction and make sure the wallet balance reflects it correct
     spend_bundle = txs[0].spend_bundle
